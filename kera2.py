@@ -42,5 +42,33 @@ class Kera:
         y_pred=model.predict(x_data)
         plt.plot(x_data,y_pred,'r-',lw=3)
         plt.show()
+    def k4(self):  #交叉熵
+        (x_train,y_train),(x_test,y_test)=keras.datasets.mnist.load_data()  #载入数据
+        print('x_shape:',x_train.shape)
+        print('y_shape',y_train.shape)
+        x_train=x_train.reshape(x_train.shape[0],-1)/255.0
+        x_test=x_test.reshape(x_test.shape[0],-1)/255.0
+        # 换为one hot格式
+        y_train=keras.utils.to_categorical(y_train,num_classes=10)
+        y_test=keras.utils.to_categorical(y_test,num_classes=10)
+        #创建模型，输入784个神经元，输出10个神经元
+        model=keras.Sequential([
+            keras.layers.Dense(units=10,input_dim=784,bias_initializer='one',activation='softmax')
+        ])
+        sgd=keras.optimizers.SGD(lr=0.2)  #定义优化器，梯度下降算法
+        model.compile(
+            optimizer=sgd,
+            loss='categorical_crossentropy',
+            metrics=['accuracy'],
+        )
+
+        # 训练模型
+        model.fit(x_train, y_train, batch_size=32, epochs=10)
+
+        # 评估模型
+        loss, accuracy = model.evaluate(x_test, y_test)
+
+        print('\ntest loss', loss)
+        print('accuracy', accuracy)
 k22=Kera()
-k22.k3()
+k22.k4()

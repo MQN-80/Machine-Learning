@@ -1,8 +1,12 @@
+import os
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 import matplotlib.pyplot as plt
-# 用于基本keras的学习
+import warnings
+import cv2 as cv
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 class Kera:
     def k1(self): #对于具有两个类的单输入模型
         model=keras.models.Sequential()#设置训练模型,顺序模型是多个网络层的线性堆叠
@@ -43,7 +47,7 @@ class Kera:
         plt.plot(x_data,y_pred,'r-',lw=3)
         plt.show()
     def k4(self):  #交叉熵
-        (x_train,y_train),(x_test,y_test)=keras.datasets.mnist.load_data()  #载入数据
+        (x_train,y_train),(x_test,y_test)=keras.datasets.fashion_mnist.load_data()  #载入数据
         print('x_shape:',x_train.shape)
         print('y_shape',y_train.shape)
         x_train=x_train.reshape(x_train.shape[0],-1)/255.0
@@ -70,5 +74,47 @@ class Kera:
 
         print('\ntest loss', loss)
         print('accuracy', accuracy)
+    # k5:dropout层的加入，防止过拟合，Dropout(0.3)加入丢弃率为0.3的层
+    # k6(self):  #引入正则化惩罚，kernel_regularizer=l2(0.0003)
+    def k7(self): #可视化显示
+        def image_plot(i, pred, true_label, img):
+            true_label, img = true_label[i], img[i]
+            plt.grid(False)
+            plt.xticks([])
+            plt.yticks([])
+
+            plt.imshow(img)
+            pred_label = np.argmax(pred)
+            if pred_label == true_label:
+                color = 'green'
+            else:
+                color = 'red'
+            plt.xlabel("Predicted: {} \nProb: {:2.0f}% \n(Actual: {})".format(labels[pred_label],
+                                                                              100 * np.max(pred),
+                                                                              labels[true_label]),
+                       color=color)
+    def k8(self):
+        import tensorflow_hub as hub
+
+        # Load the input image.
+        image_path = "E:\\下载\\human-pose-estimation-opencv-master\\1.jpeg"
+        image = tf.io.read_file(image_path)
+        image = tf.compat.v1.image.decode_jpeg(image)
+        image = tf.expand_dims(image, axis=0)
+        # Resize and pad the image to keep the aspect ratio and fit the expected size.
+        image = tf.cast(tf.image.resize_with_pad(image, 256, 256), dtype=tf.int32)
+
+        # Download the model from TF Hub.
+        model = hub.load("movenet_multipose_lightning_1")
+        movenet = model.signatures['serving_default']
+
+        # Run model inference.
+        outputs = movenet(image)
+        # Output is a [1, 6, 56] tensor.
+        keypoints = outputs['output_0']
+        print(keypoints.numpy())
+    def k9(self): #tensor基本操作
+        rank_0_tensor = tf.constant(4)
+        print(rank_0_tensor)
 k22=Kera()
-k22.k4()
+k22.k8()

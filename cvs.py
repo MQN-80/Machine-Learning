@@ -8,32 +8,25 @@ import gym
 import tensorflow as tf
 import tensorlayer as tl
 import matplotlib.pyplot as plt
-from gym.envs.registration import register
-register(
-    id='CartPole-v1',
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=5000,
-    reward_threshold=5000,
 
-)
 parser = argparse.ArgumentParser()
 parser.add_argument('--train', dest='train', default=False)
 parser.add_argument('--test', dest='test', default=True)
 
 parser.add_argument('--gamma', type=float, default=0.95)
 parser.add_argument('--lr', type=float, default=0.005)
-parser.add_argument('--batch_size', type=int, default=32)
+parser.add_argument('--batch_size', type=int, default=100) #原为32
 parser.add_argument('--eps', type=float, default=0.1)
 
-parser.add_argument('--train_episodes', type=int, default=500)
-parser.add_argument('--test_episodes', type=int, default=20)
+parser.add_argument('--train_episodes', type=int, default=200)
+parser.add_argument('--test_episodes', type=int, default=100)
 args = parser.parse_args()
 
-ALG_NAME = 'DDQN'
+ALG_NAME = 'DQN'
 ENV_ID = 'CartPole-v1'
 
 class ReplayBuffer:
-    def __init__(self, capacity=10000):
+    def __init__(self, capacity=100000):
         self.capacity = capacity
         self.buffer = []
         self.position = 0
@@ -47,14 +40,13 @@ class ReplayBuffer:
     def sample(self, batch_size = args.batch_size):
         batch = random.sample(self.buffer, batch_size)
         state, action, reward, next_state, done = map(np.stack, zip(*batch))
-        """ 
+        return state, action, reward, next_state, done
+""" 
         the * serves as unpack: sum(a,b) <=> batch=(a,b), sum(*batch) ;
         zip: a=[1,2], b=[2,3], zip(a,b) => [(1, 2), (2, 3)] ;
         the map serves as mapping the function on each list element: map(square, [2,3]) => [4,9] ;
         np.stack((1,2)) => array([1, 2])
         """
-        return state, action, reward, next_state, done
-
 
 class Agent:
     def __init__(self, env):
@@ -66,21 +58,14 @@ class Agent:
             input_layer = tl.layers.Input(input_state_shape)
             layer_1 = tl.layers.Dense(n_units=32, act=tf.nn.relu)(input_layer)
             layer_2 = tl.layers.Dense(n_units=16, act=tf.nn.relu)(layer_1)
-            # state value
-            state_value = tl.layers.Dense(n_units=1)(layer_2)
-            # advantage value
-            q_value = tl.layers.Dense(n_units=self.action_dim)(layer_2)
-            mean = tl.layers.Lambda(lambda x: tf.reduce_mean(x, axis=1, keepdims=True))(q_value)
-            advantage = tl.layers.ElementwiseLambda(lambda x, y: x - y)([q_value, mean])
-            # output
-            output_layer = tl.layers.ElementwiseLambda(lambda x, y: x + y)([state_value, advantage])
+            output_layer = tl.layers.Dense(n_units=self.action_dim)(layer_2)
             return tl.models.Model(inputs=input_layer, outputs=output_layer)
 
         self.model = create_model([None, self.state_dim])
         self.target_model = create_model([None, self.state_dim])
         self.model.train()
         self.target_model.eval()
-        self.model_optim = tf.optimizers.Adam(lr=args.lr)
+        self.model_optim = self.target_model_optim = tf.optimizers.Adam(lr=args.lr)
 
         self.epsilon = args.eps
 
@@ -101,17 +86,15 @@ class Agent:
 
     def replay(self):
         for _ in range(100):
+            # sample an experience tuple from the dataset(buffer)
             states, actions, rewards, next_states, done = self.buffer.sample()
+            # compute the target value for the sample tuple
             # targets [batch_size, action_dim]
             # Target represents the current fitting level
             target = self.target_model(states).numpy()
-            # next_q_values [batch_size, action_diim]
-            next_target = self.target_model(next_states).numpy()
-            # next_q_value [batch_size, 1]
-            next_q_value = next_target[
-                range(args.batch_size), np.argmax(self.model(next_states), axis=1)
-            ]
-            # next_q_value = tf.reduce_max(next_q_value, axis=1)
+            # next_q_values [batch_size, action_dim]
+            next_target = self.target_model(next_states)
+            next_q_value = tf.reduce_max(next_target, axis=1)
             target[range(args.batch_size), actions] = rewards + (1 - done) * args.gamma * next_q_value
 
             # use sgd to update the network weight
@@ -123,7 +106,6 @@ class Agent:
 
 
     def test_episode(self, test_episodes):
-        y=[]
         for episode in range(test_episodes):
             state = self.env.reset().astype(np.float32)
             total_reward, done = 0, False
@@ -135,16 +117,10 @@ class Agent:
 
                 total_reward += reward
                 state = next_state
-                #self.env.render()
-            y.append(total_reward)
+                self.env.render()
             print("Test {} | episode rewards is {}".format(episode, total_reward))
-        x = range(len(y))
-        plt.xlabel('step')
-        plt.ylabel('score')
-        plt.plot(x, y)
-        plt.show()
 
-    def train(self, train_episodes=1000):
+    def train(self, train_episodes=100):
         y=[]
         if args.train:
             for episode in range(train_episodes):
@@ -163,14 +139,14 @@ class Agent:
                     self.target_update()
                 y.append(total_reward)
                 print('EP{} EpisodeReward={}'.format(episode, total_reward))
-                if total_reward==5000:
-                    break
-            x = range(len(y))
+                # if episode % 10 == 0:
+                #     self.test_episode()
+            x=range(len(y))
             plt.xlabel('step')
             plt.ylabel('score')
-            plt.plot(x, y)
-            plt.show()
+            plt.plot(x,y)
             self.saveModel()
+
         if args.test:
             self.loadModel()
             self.test_episode(test_episodes=args.test_episodes)
@@ -195,7 +171,7 @@ class Agent:
 
 if __name__ == '__main__':
     env = gym.make(ENV_ID)
-    agent = Agent(env)
     env.render()
+    agent = Agent(env)
     agent.train(train_episodes=args.train_episodes)
     env.close()

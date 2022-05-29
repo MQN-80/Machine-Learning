@@ -117,4 +117,4 @@ class Kera:
         rank_0_tensor = tf.constant(4)
         print(rank_0_tensor)
 k22=Kera()
-k22.k8()
+k22.k2()

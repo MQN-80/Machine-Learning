@@ -135,7 +135,7 @@ class Agent:
 
                 total_reward += reward
                 state = next_state
-                #self.env.render()
+                self.env.render()
             y.append(total_reward)
             print("Test {} | episode rewards is {}".format(episode, total_reward))
         x = range(len(y))
@@ -157,7 +157,7 @@ class Agent:
                     self.buffer.push(state, action, reward, next_state, done)
                     total_reward += reward
                     state = next_state
-                    # self.render()
+                    #self.env.render()  #此处注释掉是为了不用渲染画面，增快游戏速度，也可以取掉注释
                 if len(self.buffer.buffer) > args.batch_size:
                     self.replay()
                     self.target_update()

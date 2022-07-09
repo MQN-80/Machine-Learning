@@ -57,6 +57,7 @@ class Model:
             #keras.layers.Dropout(0.2),
             keras.layers.Dense(units=10, activation='softmax')
         ])
+        print("s")
         sgd = keras.optimizers.SGD(lr=0.2)  # 定义优化器，梯度下降算法
         model.compile(
             optimizer=sgd,
